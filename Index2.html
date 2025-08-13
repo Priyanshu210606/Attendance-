@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Attendance Calculator</title>
+<style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    textarea { width: 100%; height: 200px; margin-bottom: 10px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background: #f2f2f2; }
+    button { padding: 8px 15px; margin: 5px; }
+</style>
+</head>
+<body>
+
+<h2>Attendance Calculator</h2>
+<button onclick="pasteFromClipboard()">📋 Paste from Clipboard</button>
+<label> Target %: 
+    <input type="number" id="targetPercent" value="75" min="1" max="100"> 
+</label>
+<button onclick="generateReport()">Generate</button>
+
+<textarea id="inputData" placeholder="Paste your attendance data here..."></textarea>
+
+<div id="result"></div>
+
+<script>
+async function pasteFromClipboard() {
+    try {
+        const text = await navigator.clipboard.readText();
+        document.getElementById("inputData").value = text;
+    } catch (err) {
+        alert("Clipboard paste not supported or permission denied.");
+    }
+}
+
+function getClassHours(type) {
+    type = type.toLowerCase();
+    if (type.includes("lecture") || type.includes("tut")) return 1; // Lecture/Tutorial = 1 hr
+    if (type.includes("lab")) return 2; // Lab = 2 hrs
+    return 1;
+}
+
+function generateReport() {
+    const rawData = document.getElementById("inputData").value.trim();
+    const target = parseFloat(document.getElementById("targetPercent").value);
+
+    if (!rawData) return alert("Please paste your attendance data.");
+    if (isNaN(target) || target <= 0 || target > 100) return alert("Enter a valid target percentage.");
+
+    const lines = rawData.split("\n").filter(line => line.trim() && !line.startsWith("#"));
+    const results = [];
+
+    lines.forEach(line => {
+        // Split by tabs or multiple spaces
+        const cols = line.split(/\s{2,}|\t/).map(c => c.trim());
+
+        if (cols.length >= 7 && !isNaN(cols[3]) && !isNaN(cols[4]) && !isNaN(cols[5]) && !isNaN(parseFloat(cols[6]))) {
+            const subject = cols[2];
+            const subjectType = cols[3];
+            const present = parseInt(cols[3]);
+            const od = parseInt(cols[4]) || 0;
+            const absent = parseInt(cols[5]);
+            const percentage = parseFloat(cols[6]);
+
+            const totalClasses = present + od + absent;
+            const extraNeededClasses = Math.max(0, Math.ceil(
+                ((target / 100) * totalClasses - present) / (1 - target / 100)
+            ));
+
+            const hoursPerClass = getClassHours(cols[2]); // Adjust based on subject type
+            const extraHoursNeeded = extraNeededClasses * hoursPerClass;
+
+            results.push({ subject, present, total: totalClasses, percentage, neededHours: extraHoursNeeded });
+        }
+    });
+
+    let html = "<table><tr><th>Subject</th><th>Present</th><th>Total</th><th>Current %</th><th>Hours Needed</th></tr>";
+    results.forEach(r => {
+        html += `<tr>
+            <td>${r.subject}</td>
+            <td>${r.present}</td>
+            <td>${r.total}</td>
+            <td>${r.percentage.toFixed(2)}%</td>
+            <td>${r.neededHours}</td>
+        </tr>`;
+    });
+    html += "</table>";
+
+    document.getElementById("result").innerHTML = html;
+}
+</script>
+
+</body>
+</html>
